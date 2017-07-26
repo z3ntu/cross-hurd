@@ -13,7 +13,7 @@ compile_binutils ()
    rm -rf "$BINUTILS_SRC".obj &&
    mkdir -p "$BINUTILS_SRC".obj &&
    cd "$BINUTILS_SRC".obj &&
-   AR="$HOST_MACHINE-ar" AS="$HOST_MACHINE-as" \
+   AR="$HOST_MACHINE-gcc-ar" AS="$HOST_MACHINE-as" \
    ../$BINUTILS_SRC/configure \
       --host="$HOST" \
       --target="$TARGET" \
@@ -164,7 +164,7 @@ compile_full_gcc () {
    rm -rf "$GCC_SRC".obj &&
    mkdir -p "$GCC_SRC".obj &&
    cd "$GCC_SRC".obj &&
-   AR="$HOST_MACHINE-ar" \
+   AR="$HOST_MACHINE-gcc-ar" \
    LDFLAGS="-Wl,-rpath,${ROOT}/lib" \
    ../$GCC_SRC/configure \
       --prefix="$ROOT" \
@@ -230,9 +230,9 @@ print_info "Cross-compiling on $HOST to $TARGET"
 
 mkdir -p "$SYSTEM" && cd "$SYSTEM" &&
    mkdir -p bin src boot "tools/include" "tools/lib" "cross-tools/$TARGET" &&
-   rm -f /tools /cross-tools &&
-   ln -sf $PWD/tools /tools &&
-   ln -sf $PWD/cross-tools /cross-tools &&
+   sudo rm -f /tools /cross-tools &&
+   sudo ln -sf $PWD/tools /tools &&
+   sudo ln -sf $PWD/cross-tools /cross-tools &&
    ln -sfn "$SYS_ROOT"/include "$SYS_ROOT"/lib "$ROOT"/"$TARGET"/ &&
 
  cd src &&
