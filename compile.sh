@@ -392,4 +392,5 @@ cd "$SYSTEM"/src &&
    install_gcc &&
    install_ncurses &&
    install_vim &&
+   print_info "compile.sh finished successfully" &&
    exit 0
