@@ -375,6 +375,16 @@ syntax on
 EOF
 }
 
+install_make() {
+   cd "$MAKE_SRC" &&
+   ./configure --prefix="$SYS_ROOT" \
+      --build="$HOST" \
+      --host="$TARGET" &&
+   make -j$PROCS &&
+   make install &&
+   cd ..
+}
+
 cd "$SYSTEM"/src &&
    install_zlib &&
    install_gpg_error &&
@@ -397,5 +407,6 @@ cd "$SYSTEM"/src &&
    install_gcc &&
    install_ncurses &&
    install_vim &&
+   install_make &&
    print_info "compile.sh finished successfully" &&
    exit 0
