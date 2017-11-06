@@ -37,6 +37,7 @@ VIM_VERSION=7.4
 GPG_ERROR_VERSION=1.27
 GCRYPT_VERSION=1.8.1
 MAKE_VERSION=4.2.1
+BUSYBOX_VERSION=1.27.2
 # Mach, Hurd and Glibc are all taken from the Git repository.
 
 BINUTILS_SRC=binutils-"$BINUTILS_VERSION"
@@ -85,6 +86,8 @@ GCRYPT_SRC=libgcrypt-"$GCRYPT_VERSION"
 GCRYPT_PKG=${GCRYPT_SRC}.tar.bz2
 MAKE_SRC=make-"$MAKE_VERSION"
 MAKE_PKG=${MAKE_SRC}.tar.bz2
+BUSYBOX_SRC=busybox-"$BUSYBOX_VERSION"
+BUSYBOX_PKG=${BUSYBOX_SRC}.tar.bz2
 
 print_info ()
 {

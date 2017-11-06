@@ -23,6 +23,7 @@ VIM_URL=ftp://ftp.vim.org/pub/vim/unix/"$VIM_PKG"
 GPG_ERROR_URL=ftp://ftp.gnupg.org/gcrypt/libgpg-error/"$GPG_ERROR_PKG"
 GCRYPT_URL=ftp://ftp.gnupg.org/gcrypt/libgcrypt/"$GCRYPT_PKG"
 MAKE_URL=ftp://ftp.gnu.org/gnu/make/"$MAKE_PKG"
+BUSYBOX_URL=https://www.busybox.net/downloads/"$BUSYBOX_PKG"
 
 unpack () {
    if [ -d "$3" ]; then
@@ -170,5 +171,14 @@ download_make () {
     return 0
   fi
   unpack jxf $MAKE_PKG $MAKE_SRC
+}
+
+download_busybox () {
+  download $BUSYBOX_PKG $BUSYBOX_URL &&
+  if [ -d "$BUSYBOX_SRC" ]; then
+    return 0
+  fi
+  unpack jxf $BUSYBOX_PKG $BUSYBOX_SRC
+  cp $SCRIPT_DIR/busybox.config $BUSYBOX_SRC/.config
 }
 

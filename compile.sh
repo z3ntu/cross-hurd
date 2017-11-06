@@ -385,6 +385,13 @@ install_make() {
    cd ..
 }
 
+install_busybox() {
+   cd "$BUSYBOX_SRC" &&
+   LDFLAGS="-static" make -j$PROCS CROSS_COMPILE="i586-pc-gnu-" &&
+   make install &&
+   cd ..
+}
+
 cd "$SYSTEM"/src &&
    install_zlib &&
    install_gpg_error &&
@@ -408,5 +415,6 @@ cd "$SYSTEM"/src &&
    install_ncurses &&
    install_vim &&
    install_make &&
+   install_busybox &&
    print_info "compile.sh finished successfully" &&
    exit 0
