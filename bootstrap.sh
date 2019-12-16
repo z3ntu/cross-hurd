@@ -232,13 +232,21 @@ print_info "Cross-compiling on $HOST to $TARGET"
 
 create_tools_symlink() {
     set -x
-    if [ $(readlink /tools) != "$PWD/tools" ]; then
-        sudo rm -f /tools
-        sudo ln -sf "$PWD"/tools /tools
+    if [[ ! -d /tools ]]; then
+		mkdir -p /tools
+		ln -sf "$PWD"/tools /tools
+	fi
+    if [[ $(readlink /tools) != "$PWD/tools" ]]; then
+		rm -rf /tools
+        ln -sf "$PWD"/tools /tools
     fi
-    if [ $(readlink /cross-tools) != "$PWD/cross-tools" ]; then
-        sudo rm -f /cross-tools
-        sudo ln -sf "$PWD"/cross-tools /cross-tools
+    if [[ ! -d /cross-tools ]]; then
+		mkdir -p /cross-tools
+		ln -sf "$PWD"/cross-tools /cross-tools
+	fi
+    if [[ $(readlink /cross-tools) != "$PWD/cross-tools" ]]; then
+        rm -rf /cross-tools
+        ln -sf "$PWD"/cross-tools /cross-tools
     fi
     set +x
 }
