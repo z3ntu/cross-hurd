@@ -8,4 +8,4 @@ export PROCS=6
 export CCACHE_DIRECTORY="/usr/lib/ccache/bin"
 
 # GNU Hurd target.
-export CPU=i586
+export CPU=i686
