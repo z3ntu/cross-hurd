@@ -21,6 +21,12 @@ unpack zxf $BASH_PKG $BASH_SRC &&
 download_coreutils &&
 download $E2FSPROGS_PKG $E2FSPROGS_URL &&
 unpack zxf $E2FSPROGS_PKG $E2FSPROGS_SRC &&
+pushd $E2FSPROGS_SRC &&
+apply_patch_optional $SCRIPT_DIR/patches/e2fsprogs/configure.ac.diff 1 || true &&
+apply_patch_optional $SCRIPT_DIR/patches/e2fsprogs/configure.ac_2.diff 1 || true &&
+apply_patch_optional $SCRIPT_DIR/patches/e2fsprogs/lib_ext2fs_dirhash.c.diff 1 || true &&
+apply_patch_optional $SCRIPT_DIR/patches/e2fsprogs/Makefile.in.diff 1 || true &&
+popd &&
 download $PKGCONFIGLITE_PKG $PKGCONFIGLITE_URL &&
 unpack zxf $PKGCONFIGLITE_PKG $PKGCONFIGLITE_SRC &&
 download $LIBUUID_PKG $LIBUUID_URL &&

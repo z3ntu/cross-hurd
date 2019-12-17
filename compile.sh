@@ -188,6 +188,8 @@ install_libuuid() {
 
 install_e2fsprogs() {
    cd "$E2FSPROGS_SRC" &&
+   # We patch configure.ac so we have to regenerate the files
+   autoreconf -fi &&
    rm -rf build &&
    mkdir -vp build && cd build &&
    LDFLAGS="-luuid" ../configure \
