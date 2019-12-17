@@ -74,8 +74,8 @@ compile_gcc ()
    make install-gcc &&
    make -j$PROCS configure-target-libgcc &&
    cd "$TARGET"/libgcc &&
-   make -j$PROCS 'libgcc-objects = $(lib2funcs-o) $(lib2-divmod-o)' all &&
-   make 'libgcc-objects = $(lib2funcs-o) $(lib2-divmod-o)' install &&
+   make -j$PROCS all &&
+   make install &&
    cd - &&
    mv config.status config.status.removed &&
    rm -f config.cache *config.cache */*/config.cache &&
@@ -139,6 +139,8 @@ compile_first_glibc() {
    mkdir -p "$GLIBC_SRC".first_obj &&
    cd "$GLIBC_SRC".first_obj &&
    BUILD_CC="$HOST_MACHINE-gcc" CC="$TARGET"-gcc \
+   # see https://sourceware.org/bugzilla/show_bug.cgi?id=24183
+   CXX="$TARGET"-g++ \
    AR="$TARGET"-ar RANLIB="$TARGET"-ranlib \
    ../$GLIBC_SRC/configure \
       --with-binutils=${ROOT}/bin \
@@ -152,8 +154,9 @@ compile_first_glibc() {
       --enable-add-ons=libpthread \
       --enable-obsolete-rpc \
       --disable-werror \
-      --disable-nscd &&
-   make -j$PROCS || # workaround for "fails first time"?
+      --disable-nscd \
+      libc_cv_ctors_header=yes &&
+#   make -j$PROCS || # workaround for "fails first time"?
    make -j$PROCS &&
    make install &&
    cd ..
@@ -169,6 +172,8 @@ compile_full_gcc () {
    LDFLAGS="-Wl,-rpath,${ROOT}/lib" \
    ../$GCC_SRC/configure \
       --prefix="$ROOT" \
+      --build="$HOST" \
+      --host="$HOST" \
       --target="$TARGET" \
       --with-sysroot="$SYSTEM" \
       --with-local-prefix="$SYS_ROOT" \
@@ -197,6 +202,8 @@ compile_second_glibc() {
    cd "$GLIBC_SRC".second_obj &&
    rm -f config.cache &&
    BUILD_CC="$HOST_MACHINE-gcc" CC="$TARGET"-gcc \
+   # see https://sourceware.org/bugzilla/show_bug.cgi?id=24183
+   CXX="$TARGET"-g++ \
    AR="$TARGET"-ar RANLIB="$TARGET"-ranlib \
    ../$GLIBC_SRC/configure \
       --with-binutils=${ROOT}/bin \
