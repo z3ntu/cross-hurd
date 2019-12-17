@@ -21,6 +21,10 @@ unpack zxf $BASH_PKG $BASH_SRC &&
 download_coreutils &&
 download $E2FSPROGS_PKG $E2FSPROGS_URL &&
 unpack zxf $E2FSPROGS_PKG $E2FSPROGS_SRC &&
+pushd $E2FSPROGS_SRC &&
+apply_patch_optional $SCRIPT_DIR/patches/e2fsprogs/01551bdba16ab16512a01affe02ade32c41ede8a.patch 1 || true &&
+apply_patch_optional $SCRIPT_DIR/patches/e2fsprogs/3fb715b55426875902dfef3056b2cf7335953178.patch 1 || true &&
+popd &&
 download $PKGCONFIGLITE_PKG $PKGCONFIGLITE_URL &&
 unpack zxf $PKGCONFIGLITE_PKG $PKGCONFIGLITE_SRC &&
 download $LIBUUID_PKG $LIBUUID_URL &&
