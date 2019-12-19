@@ -378,6 +378,8 @@ EOF
 
 install_make() {
    cd "$MAKE_SRC" &&
+   # 'aclocal-1.15' is missing on your system.
+   autoreconf -fi &&
    ./configure --prefix="$SYS_ROOT" \
       --build="$HOST" \
       --host="$TARGET" &&
