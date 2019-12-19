@@ -238,11 +238,11 @@ print_info "Cross-compiling on $HOST to $TARGET"
 
 create_tools_symlink() {
     set -x
-    if [ $(readlink /tools) != "$PWD/tools" ]; then
+    if [ "$(readlink /tools)" != "$PWD/tools" ]; then
         sudo rm -f /tools
         sudo ln -sf "$PWD"/tools /tools
     fi
-    if [ $(readlink /cross-tools) != "$PWD/cross-tools" ]; then
+    if [ "$(readlink /cross-tools)" != "$PWD/cross-tools" ]; then
         sudo rm -f /cross-tools
         sudo ln -sf "$PWD"/cross-tools /cross-tools
     fi
