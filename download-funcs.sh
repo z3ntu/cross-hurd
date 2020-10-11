@@ -74,13 +74,7 @@ download_glibc () {
    if [ -d glibc ]; then
       return 0
    fi
-   git clone https://git.savannah.gnu.org/git/hurd/glibc.git -b tschwinge/Roger_Whittaker &&
-   cd glibc &&
-   git clone https://git.savannah.gnu.org/git/hurd/libpthread.git &&
-   (for p in $SCRIPT_DIR/patches/glibc/*; do
-      apply_patch $p 1
-   done) &&
-   cd ..
+   git clone git://sourceware.org/git/glibc.git
 }
 
 unpack_gcc () {
