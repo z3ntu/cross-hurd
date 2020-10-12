@@ -21,7 +21,7 @@ ZLIB_VERSION=1.2.11
 BASH_VERSION=5.0
 COREUTILS_VERSION=8.31
 # e2fsprogs 1.45.4 is failing due to something with sys/mount.h in configure
-E2FSPROGS_VERSION=1.43.4
+E2FSPROGS_VERSION=1.43.8
 PKGCONFIGLITE_VERSION=0.28-1
 LIBUUID_VERSION=1.0.3
 UTIL_LINUX_VERSION=2.34
@@ -30,7 +30,7 @@ GRUB_VERSION=2.04
 SHADOW_VERSION=4.6
 SED_VERSION=4.5
 GMP_VERSION=6.1.2
-MPFR_VERSION=4.0.2
+MPFR_VERSION=4.1.0
 MPC_VERSION=1.1.0
 NCURSES_VERSION=6.1
 # 8.1: checking what tgetent() returns for an unknown terminal... configure: error: failed to compile test program.

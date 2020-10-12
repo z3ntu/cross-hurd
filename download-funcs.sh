@@ -177,5 +177,10 @@ download_make () {
     return 0
   fi
   unpack jxf $MAKE_PKG $MAKE_SRC
+  cd $MAKE_SRC &&
+  (for p in $SCRIPT_DIR/patches/make/*; do
+    apply_patch $p 1
+  done) &&
+  cd ..
 }
 

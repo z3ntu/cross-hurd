@@ -74,8 +74,8 @@ compile_gcc ()
    make install-gcc &&
    make -j$PROCS configure-target-libgcc &&
    cd "$TARGET"/libgcc &&
-   make -j$PROCS 'libgcc-objects = $(lib2funcs-o) $(lib2-divmod-o)' all &&
-   make 'libgcc-objects = $(lib2funcs-o) $(lib2-divmod-o)' install &&
+   make -j$PROCS all &&
+   make install &&
    cd - &&
    mv config.status config.status.removed &&
    rm -f config.cache *config.cache */*/config.cache &&
@@ -152,7 +152,8 @@ compile_first_glibc() {
       --enable-add-ons=libpthread \
       --enable-obsolete-rpc \
       --disable-werror \
-      --disable-nscd &&
+      --disable-nscd \
+      libc_cv_ctors_header=yes &&
    make -j$PROCS || # workaround for "fails first time"?
    make -j$PROCS &&
    make install &&
@@ -231,13 +232,21 @@ print_info "Cross-compiling on $HOST to $TARGET"
 
 create_tools_symlink() {
     set -x
-    if [ $(readlink /tools) != "$PWD/tools" ]; then
-        sudo rm -f /tools
-        sudo ln -sf "$PWD"/tools /tools
+    if [[ ! -d /tools ]]; then
+		mkdir -p /tools
+		ln -sf "$PWD"/tools /tools
+	fi
+    if [[ $(readlink /tools) != "$PWD/tools" ]]; then
+		rm -rf /tools
+        ln -sf "$PWD"/tools /tools
     fi
-    if [ $(readlink /cross-tools) != "$PWD/cross-tools" ]; then
-        sudo rm -f /cross-tools
-        sudo ln -sf "$PWD"/cross-tools /cross-tools
+    if [[ ! -d /cross-tools ]]; then
+		mkdir -p /cross-tools
+		ln -sf "$PWD"/cross-tools /cross-tools
+	fi
+    if [[ $(readlink /cross-tools) != "$PWD/cross-tools" ]]; then
+        rm -rf /cross-tools
+        ln -sf "$PWD"/cross-tools /cross-tools
     fi
     set +x
 }
