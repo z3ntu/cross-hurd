@@ -1,0 +1,624 @@
+From 5690693288769955e617623ff5288ca9daf6559d Mon Sep 17 00:00:00 2001
+From: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date: Sat, 14 Nov 2020 23:35:35 +0000
+Subject: [PATCH] hurd: Remove some remnants of cthreads
+
+Libc has actually been using mach's lock-internal.h mutex for a long
+time already.
+---
+ conform/Makefile                        |  5 ++-
+ htl/libpthread_syms.a                   |  4 +-
+ htl/lockfile.c                          |  1 -
+ hurd/dtable.c                           |  2 +-
+ hurd/hurd.h                             |  4 --
+ hurd/hurd/fd.h                          |  5 ++-
+ hurd/hurd/id.h                          |  2 +-
+ hurd/hurd/signal.h                      |  5 +--
+ hurd/hurdmalloc.c                       | 13 +++----
+ hurd/hurdpid.c                          |  2 -
+ hurd/hurdrlimit.c                       |  2 +-
+ hurd/hurdsig.c                          | 52 ++++++++++++-------------
+ hurd/hurdsock.c                         |  2 +-
+ hurd/hurdstartup.c                      | 10 +----
+ hurd/msgportdemux.c                     |  6 +--
+ mach/lock-intern.h                      |  9 +++++
+ mach/mutex-solid.c                      |  7 ++--
+ scripts/check-local-headers.sh          |  2 +-
+ sysdeps/htl/Makeconfig                  |  2 +-
+ sysdeps/htl/bits/pthread-np.h           |  2 +-
+ sysdeps/hurd/include/hurd/signal.h      |  2 +
+ sysdeps/mach/hurd/brk.c                 |  2 +-
+ sysdeps/mach/hurd/cthreads.c            |  8 ++--
+ sysdeps/mach/hurd/fork.c                |  2 +-
+ sysdeps/mach/hurd/htl/bits/pthread-np.h |  2 +-
+ sysdeps/mach/hurd/i386/Makefile         |  2 +
+ sysdeps/mach/hurd/profil.c              |  2 +-
+ 27 files changed, 77 insertions(+), 80 deletions(-)
+
+diff --git a/conform/Makefile b/conform/Makefile
+index 0b5c4cb8ce..015037f267 100644
+--- a/conform/Makefile
++++ b/conform/Makefile
+@@ -189,14 +189,15 @@ $(linknamespace-symlists-tests): $(objpfx)symlist-%: list-header-symbols.py
+ 
+ linknamespace-libs-isoc = $(common-objpfx)libc.a $(common-objpfx)math/libm.a
+ linknamespace-libs-thr = $(linknamespace-libs-isoc) \
+-			 $(common-objpfx)rt/librt.a $(static-thread-library)
++			 $(common-objpfx)rt/librt.a \
++			 $(filter-out %_syms.a,$(static-thread-library))
+ linknamespace-libs-posix = $(linknamespace-libs-thr) \
+ 			   $(common-objpfx)dlfcn/libdl.a
+ linknamespace-libs-xsi = $(linknamespace-libs-posix)
+ linknamespace-libs-ISO = $(linknamespace-libs-isoc)
+ linknamespace-libs-ISO99 = $(linknamespace-libs-isoc)
+ linknamespace-libs-ISO11 = $(linknamespace-libs-isoc) \
+-			   $(static-thread-library)
++			   $(filter-out %_syms.a,$(static-thread-library))
+ linknamespace-libs-XPG4 = $(linknamespace-libs-isoc)
+ linknamespace-libs-XPG42 = $(linknamespace-libs-XPG4)
+ linknamespace-libs-POSIX = $(linknamespace-libs-thr)
+diff --git a/htl/libpthread_syms.a b/htl/libpthread_syms.a
+index 3801ec93c8..dd8c72684f 100644
+--- a/htl/libpthread_syms.a
++++ b/htl/libpthread_syms.a
+@@ -15,7 +15,9 @@ EXTERN(__mutex_unlock_solid)
+ EXTERN(_cthreads_flockfile)
+ EXTERN(_cthreads_funlockfile)
+ EXTERN(_cthreads_ftrylockfile)
+-/* To get the sigthread stack layout on fork */
++/* To create the sigthread and get its stack layout on fork */
++EXTERN(pthread_create)
++EXTERN(pthread_detach)
+ EXTERN(pthread_getattr_np)
+ EXTERN(pthread_attr_getstack)
+ EXTERN(__pthread_enable_asynccancel)
+diff --git a/htl/lockfile.c b/htl/lockfile.c
+index 51ed5ef8cc..12f077e645 100644
+--- a/htl/lockfile.c
++++ b/htl/lockfile.c
+@@ -16,7 +16,6 @@
+    License along with the GNU C Library;  if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#include <cthreads.h>
+ #include <pthread.h>		/* Must come before <stdio.h>! */
+ #include <stdio.h>
+ 
+diff --git a/hurd/dtable.c b/hurd/dtable.c
+index 9f6ae2f606..80d02474fa 100644
+--- a/hurd/dtable.c
++++ b/hurd/dtable.c
+@@ -22,7 +22,7 @@
+ #include <stdio.h>
+ #include <fcntl.h>
+ #include <limits.h>
+-#include <cthreads.h>		/* For `struct mutex'.  */
++#include <lock-intern.h>	/* For `struct mutex'.  */
+ #include "set-hooks.h"
+ #include "hurdmalloc.h"		/* XXX */
+ 
+diff --git a/hurd/hurd.h b/hurd/hurd.h
+index 8f1fdf4a64..c6e88a63c2 100644
+--- a/hurd/hurd.h
++++ b/hurd/hurd.h
+@@ -103,7 +103,6 @@ extern error_t _hurd_ports_use (int which, error_t (*operate) (mach_port_t));
+ 
+ 
+ /* Base address and size of the initial stack set up by the exec server.
+-   If using cthreads, this stack is deallocated in startup.
+    Not locked.  */
+ 
+ extern vm_address_t _hurd_stack_base;
+@@ -123,9 +122,6 @@ extern int _hurd_orphaned;
+ 
+ /* This variable is incremented every time the process IDs change.  */
+ extern unsigned int _hurd_pids_changed_stamp;
+-
+-/* This condition is broadcast every time the process IDs change.  */
+-extern struct condition _hurd_pids_changed_sync;
+ 
+ /* Unix `data break', for brk and sbrk.
+    If brk and sbrk are not used, this info will not be initialized or used.  */
+diff --git a/hurd/hurd/fd.h b/hurd/hurd/fd.h
+index d27be21cfd..273406fbf8 100644
+--- a/hurd/hurd/fd.h
++++ b/hurd/hurd/fd.h
+@@ -21,8 +21,6 @@
+ #define	_HURD_FD_H	1
+ #include <features.h>
+ 
+-#include <cthreads.h>
+-
+ #include <hurd/hurd_types.h>
+ #include <hurd/port.h>
+ #include <sys/socket.h>
+@@ -47,9 +45,12 @@ struct hurd_fd
+ 
+ /* Current file descriptor table.  */
+ 
++#if defined __USE_EXTERN_INLINES && defined _LIBC
++#include <lock-intern.h>
+ extern int _hurd_dtablesize;
+ extern struct hurd_fd **_hurd_dtable;
+ extern struct mutex _hurd_dtable_lock; /* Locks those two variables.  */
++#endif
+ 
+ #include <hurd/signal.h>
+ 
+diff --git a/hurd/hurd/id.h b/hurd/hurd/id.h
+index bb796e1788..944df218d4 100644
+--- a/hurd/hurd/id.h
++++ b/hurd/hurd/id.h
+@@ -24,7 +24,7 @@
+ #include <errno.h>
+ #include <bits/types/error_t.h>
+ 
+-#include <cthreads.h>		/* For `struct mutex'.  */
++#include <lock-intern.h>	/* For `struct mutex'.  */
+ 
+ /* Structure describing authorization data for the process.  */
+ 
+diff --git a/hurd/hurd/signal.h b/hurd/hurd/signal.h
+index 933fafa2c3..f6f91218db 100644
+--- a/hurd/hurd/signal.h
++++ b/hurd/hurd/signal.h
+@@ -37,7 +37,6 @@
+ #include <bits/sigaction.h>
+ #include <hurd/msg.h>
+ 
+-#include <cthreads.h>		/* For `struct mutex'.  */
+ #include <setjmp.h>		/* For `jmp_buf'.  */
+ #include <spin-lock.h>
+ struct hurd_signal_preemptor;	/* <hurd/sigpreempt.h> */
+@@ -120,8 +119,6 @@ struct hurd_sigstate
+ 
+ extern struct hurd_sigstate *_hurd_sigstates;
+ 
+-extern struct mutex _hurd_siglock; /* Locks _hurd_sigstates.  */
+-
+ /* Get the sigstate of a given thread, taking its lock.  */
+ 
+ extern struct hurd_sigstate *_hurd_thread_sigstate (thread_t);
+@@ -325,7 +322,7 @@ _hurd_setup_sighandler (struct hurd_sigstate *ss, __sighandler_t handler,
+ 
+ /* Function run by the signal thread to receive from the signal port.  */
+ 
+-extern void _hurd_msgport_receive (void);
++extern void *_hurd_msgport_receive (void *arg);
+ 
+ /* Set up STATE with a thread state that, when resumed, is
+    like `longjmp (_hurd_sigthread_fault_env, 1)'.  */
+diff --git a/hurd/hurdmalloc.c b/hurd/hurdmalloc.c
+index 65fb959d84..7046bcef33 100644
+--- a/hurd/hurdmalloc.c
++++ b/hurd/hurdmalloc.c
+@@ -4,6 +4,7 @@
+ #include "hurdmalloc.h"		/* XXX see that file */
+ 
+ #include <mach.h>
++#include <mach/spin-lock.h>
+ #define vm_allocate __vm_allocate
+ #define vm_page_size __vm_page_size
+ 
+@@ -79,8 +80,6 @@
+ 
+ #include <assert.h>
+ 
+-#include <cthreads.h>
+-
+ #define MCHECK
+ 
+ /*
+@@ -221,7 +220,7 @@ malloc (size_t size)
+ 		i += 1;
+ 		n <<= 1;
+ 	}
+-	ASSERT(i < NBUCKETS);
++	assert(i < NBUCKETS);
+ 	fl = &malloc_free_list[i];
+ 	spin_lock(&fl->lock);
+ 	h = fl->head;
+@@ -291,11 +290,11 @@ free (void *base)
+ 	 * Sanity checks.
+ 	 */
+ 	if (i < 0 || i >= NBUCKETS) {
+-		ASSERT(0 <= i && i < NBUCKETS);
++		assert(0 <= i && i < NBUCKETS);
+ 		return;
+ 	}
+ 	if (fl != &malloc_free_list[i]) {
+-		ASSERT(fl == &malloc_free_list[i]);
++		assert(fl == &malloc_free_list[i]);
+ 		return;
+ 	}
+ 	/*
+@@ -340,11 +339,11 @@ realloc (void *old_base, size_t new_size)
+ 	 * Sanity checks.
+ 	 */
+ 	if (i < 0 || i >= NBUCKETS) {
+-		ASSERT(0 <= i && i < NBUCKETS);
++		assert(0 <= i && i < NBUCKETS);
+ 		return 0;
+ 	}
+ 	if (fl != &malloc_free_list[i]) {
+-		ASSERT(fl == &malloc_free_list[i]);
++		assert(fl == &malloc_free_list[i]);
+ 		return 0;
+ 	}
+ 	/*
+diff --git a/hurd/hurdpid.c b/hurd/hurdpid.c
+index 196177c403..dd8281cda7 100644
+--- a/hurd/hurdpid.c
++++ b/hurd/hurdpid.c
+@@ -37,13 +37,11 @@ text_set_element (_hurd_proc_subinit, init_pids);
+ 
+ #include <hurd/msg_server.h>
+ #include "set-hooks.h"
+-#include <cthreads.h>
+ 
+ DEFINE_HOOK (_hurd_pgrp_changed_hook, (pid_t));
+ 
+ /* These let user threads synchronize with an operation which changes ids.  */
+ unsigned int _hurd_pids_changed_stamp;
+-struct condition _hurd_pids_changed_sync;
+ 
+ kern_return_t
+ _S_msg_proc_newids (mach_port_t me,
+diff --git a/hurd/hurdrlimit.c b/hurd/hurdrlimit.c
+index 4216390924..94f62b06b7 100644
+--- a/hurd/hurdrlimit.c
++++ b/hurd/hurdrlimit.c
+@@ -17,7 +17,7 @@
+    <https://www.gnu.org/licenses/>.  */
+ 
+ #include <hurd.h>
+-#include <cthreads.h>
++#include <lock-intern.h>
+ #include <hurd/resource.h>
+ 
+ /* This must be given an initializer, or the a.out linking rules will
+diff --git a/hurd/hurdsig.c b/hurd/hurdsig.c
+index bba72bd7c0..852ae7e441 100644
+--- a/hurd/hurdsig.c
++++ b/hurd/hurdsig.c
+@@ -19,11 +19,12 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
+-#include <cthreads.h>		/* For `struct mutex'.  */
++#include <lock-intern.h>	/* For `struct mutex'.  */
+ #include <pthreadP.h>
+ #include <mach.h>
+ #include <mach/thread_switch.h>
+ #include <mach/mig_support.h>
++#include <mach/vm_param.h>
+ 
+ #include <hurd.h>
+ #include <hurd/id.h>
+@@ -1477,8 +1478,8 @@ _hurdsig_init (const int *intarray, size_t intarraysize)
+ 
+   /* Start the signal thread listening on the message port.  */
+ 
+-#pragma weak __cthread_fork
+-  if (!__cthread_fork)
++#pragma weak __pthread_create
++  if (!__pthread_create)
+     {
+       err = __thread_create (__mach_task_self (), &_hurd_msgport_thread);
+       assert_perror (err);
+@@ -1503,41 +1504,40 @@ _hurdsig_init (const int *intarray, size_t intarraysize)
+     }
+   else
+     {
+-      /* When cthreads is being used, we need to make the signal thread a
+-         proper cthread.  Otherwise it cannot use mutex_lock et al, which
+-         will be the cthreads versions.  Various of the message port RPC
++      pthread_t thread;
++      pthread_attr_t attr;
++      void *addr;
++      size_t size;
++
++      /* When pthread is being used, we need to make the signal thread a
++         proper pthread.  Otherwise it cannot use mutex_lock et al, which
++         will be the pthread versions.  Various of the message port RPC
+          handlers need to take locks, so we need to be able to call into
+-         cthreads code and meet its assumptions about how our thread and
+-         its stack are arranged.  Since cthreads puts it there anyway,
++         pthread code and meet its assumptions about how our thread and
++         its stack are arranged.  Since pthread puts it there anyway,
+          we'll let the signal thread's per-thread variables be found as for
+-         any normal cthread, and just leave the magic __hurd_sigthread_*
++         any normal pthread, and just leave the magic __hurd_sigthread_*
+          values all zero so they'll be ignored.  */
+-#pragma weak __cthread_detach
++
++#pragma weak __pthread_detach
+ #pragma weak __pthread_getattr_np
+ #pragma weak __pthread_attr_getstack
+-      __cthread_t thread = __cthread_fork (
+-			     (cthread_fn_t) &_hurd_msgport_receive, 0);
+-      __cthread_detach (thread);
++      __pthread_create(&thread, NULL, &_hurd_msgport_receive, NULL);
+ 
+-      if (__pthread_getattr_np)
+-	{
+-	  /* Record signal thread stack layout for fork() */
+-	  pthread_attr_t attr;
+-	  void *addr;
+-	  size_t size;
+-
+-	  __pthread_getattr_np ((pthread_t) thread, &attr);
+-	  __pthread_attr_getstack (&attr, &addr, &size);
+-	  __hurd_sigthread_stack_base = (uintptr_t) addr;
+-	  __hurd_sigthread_stack_end = __hurd_sigthread_stack_base + size;
+-	}
++      /* Record signal thread stack layout for fork() */
++      __pthread_getattr_np (thread, &attr);
++      __pthread_attr_getstack (&attr, &addr, &size);
++      __hurd_sigthread_stack_base = (uintptr_t) addr;
++      __hurd_sigthread_stack_end = __hurd_sigthread_stack_base + size;
++
++      __pthread_detach(thread);
+ 
+       /* XXX We need the thread port for the signal thread further on
+          in this thread (see hurdfault.c:_hurdsigfault_init).
+          Therefore we block until _hurd_msgport_thread is initialized
+          by the newly created thread.  This really shouldn't be
+          necessary; we should be able to fetch the thread port for a
+-         cthread from here.  */
++         pthread from here.  */
+       while (_hurd_msgport_thread == 0)
+ 	__swtch_pri (0);
+     }
+diff --git a/hurd/hurdsock.c b/hurd/hurdsock.c
+index f77c83ee9e..e7222a8b19 100644
+--- a/hurd/hurdsock.c
++++ b/hurd/hurdsock.c
+@@ -23,7 +23,7 @@
+ #include <hurd/paths.h>
+ #include <stdio.h>
+ #include <_itoa.h>
+-#include <cthreads.h>		/* For `struct mutex'.  */
++#include <lock-intern.h>	/* For `struct mutex'.  */
+ #include "hurdmalloc.h"		/* XXX */
+ 
+ static struct mutex lock;
+diff --git a/hurd/hurdstartup.c b/hurd/hurdstartup.c
+index b67de45bc9..abe0dde8f3 100644
+--- a/hurd/hurdstartup.c
++++ b/hurd/hurdstartup.c
+@@ -41,15 +41,7 @@ extern void __mach_init (void);
+    initialization so mig-generated stubs work, and then do an exec_startup
+    RPC on our bootstrap port, to which the exec server responds with the
+    information passed in the exec call, as well as our original bootstrap
+-   port, and the base address and size of the preallocated stack.
+-
+-   If using cthreads, we are given a new stack by cthreads initialization and
+-   deallocate the stack set up by the exec server.  On the new stack we call
+-   `start1' (above) to do the rest of the startup work.  Since the stack may
+-   disappear out from under us in a machine-dependent way, we use a pile of
+-   static variables to communicate the information from exec_startup to start1.
+-   This is unfortunate but preferable to machine-dependent frobnication to copy
+-   the state from the old stack to the new one.  */
++   port, and the base address and size of the preallocated stack.  */
+ 
+ 
+ void
+diff --git a/hurd/msgportdemux.c b/hurd/msgportdemux.c
+index 7d5f6a5a66..6b35076a04 100644
+--- a/hurd/msgportdemux.c
++++ b/hurd/msgportdemux.c
+@@ -51,14 +51,14 @@ msgport_server (mach_msg_header_t *inp,
+ }
+ 
+ /* This is the code that the signal thread runs.  */
+-void
+-_hurd_msgport_receive (void)
++void *
++_hurd_msgport_receive (void *arg)
+ {
+   /* Get our own sigstate cached so we never again have to take a lock to
+      fetch it.  There is much code in hurdsig.c that operates with some
+      sigstate lock held, which will deadlock with _hurd_thread_sigstate.
+ 
+-     Furthermore, in the cthreads case this is the convenient spot
++     Furthermore, in the pthread case this is the convenient spot
+      to initialize _hurd_msgport_thread (see hurdsig.c:_hurdsig_init).  */
+ 
+   _hurd_msgport_thread = _hurd_self_sigstate ()->thread;
+diff --git a/mach/lock-intern.h b/mach/lock-intern.h
+index b6a075bc3a..a68674cef4 100644
+--- a/mach/lock-intern.h
++++ b/mach/lock-intern.h
+@@ -95,6 +95,15 @@ __spin_lock_locked (__spin_lock_t *__lock)
+ #endif
+ 
+ /* Name space-clean internal interface to mutex locks.  */
++struct mutex {
++	__spin_lock_t __held;
++	__spin_lock_t __lock;
++	const char *__name;
++	void *__head, *__tail;
++	void *__holder;
++};
++
++#define MUTEX_INITIALIZER { __SPIN_LOCK_INITIALIZER }
+ 
+ /* Initialize the newly allocated mutex lock LOCK for further use.  */
+ extern void __mutex_init (void *__lock);
+diff --git a/mach/mutex-solid.c b/mach/mutex-solid.c
+index 7ed9ce8c28..13c01fb511 100644
+--- a/mach/mutex-solid.c
++++ b/mach/mutex-solid.c
+@@ -17,11 +17,10 @@
+    <https://www.gnu.org/licenses/>.  */
+ 
+ #include <lock-intern.h>
+-#include <cthreads.h>
+ 
+-/* If cthreads is linked in, it will define these functions itself to do
+-   real cthreads mutex locks.  This file will only be linked in when
+-   cthreads is not used, and `mutexes' are in fact just spin locks (and
++/* If pthread is linked in, it will define these functions itself to do
++   real pthread mutex locks.  This file will only be linked in when
++   pthread is not used, and `mutexes' are in fact just spin locks (and
+    some unused storage).  */
+ 
+ void
+diff --git a/scripts/check-local-headers.sh b/scripts/check-local-headers.sh
+index 36a75897a9..837b3e9c70 100755
+--- a/scripts/check-local-headers.sh
++++ b/scripts/check-local-headers.sh
+@@ -33,7 +33,7 @@ exec ${AWK} -v includedir="$includedir" '
+ BEGIN {
+   status = 0
+   exclude = "^" includedir \
+-    "/(.*-.*-.*/|.*-.*/|)(asm[-/]|arch|linux/|selinux/|mach/|mach_debug/|device/|hurd/(((hurd|ioctl)_types|paths)\\.h|ioctls\\.defs|ihash\\.h)|cthreads\\.h|gd|nss3/|nspr4?/|c\\+\\+/|sys/(capability|sdt(|-config))\\.h|libaudit\\.h)"
++    "/(.*-.*-.*/|.*-.*/|)(asm[-/]|arch|linux/|selinux/|mach/|mach_debug/|device/|hurd/(((hurd|ioctl)_types|paths)\\.h|ioctls\\.defs|ihash\\.h)|gd|nss3/|nspr4?/|c\\+\\+/|sys/(capability|sdt(|-config))\\.h|libaudit\\.h)"
+ }
+ /^[^ ]/ && $1 ~ /.*:/ { obj = $1 }
+ {
+diff --git a/sysdeps/htl/Makeconfig b/sysdeps/htl/Makeconfig
+index ad56cc6bd1..e8a8f405b0 100644
+--- a/sysdeps/htl/Makeconfig
++++ b/sysdeps/htl/Makeconfig
+@@ -4,7 +4,7 @@
+ have-thread-library = yes
+ 
+ shared-thread-library = $(common-objpfx)htl/libpthread.so
+-static-thread-library = $(common-objpfx)htl/libpthread.a
++static-thread-library = $(..)htl/libpthread_syms.a $(common-objpfx)htl/libpthread.a
+ bounded-thread-library = $(static-thread-library)
+ 
+ rpath-dirs += htl
+diff --git a/sysdeps/htl/bits/pthread-np.h b/sysdeps/htl/bits/pthread-np.h
+index 13a0421334..8c7dc4e104 100644
+--- a/sysdeps/htl/bits/pthread-np.h
++++ b/sysdeps/htl/bits/pthread-np.h
+@@ -17,7 +17,7 @@
+    <https://www.gnu.org/licenses/>.  */
+ 
+ /*
+- * Never include this file directly; use <pthread.h> or <cthreads.h> instead.
++ * Never include this file directly; use <pthread.h> instead.
+  */
+ 
+ #ifndef _BITS_PTHREAD_NP_H
+diff --git a/sysdeps/hurd/include/hurd/signal.h b/sysdeps/hurd/include/hurd/signal.h
+index f4627a7204..1dc8a1f353 100644
+--- a/sysdeps/hurd/include/hurd/signal.h
++++ b/sysdeps/hurd/include/hurd/signal.h
+@@ -1,3 +1,5 @@
++extern struct mutex _hurd_siglock; /* Locks _hurd_sigstates.  */
++
+ #ifndef	_HURD_SIGNAL_H
+ extern struct hurd_sigstate *_hurd_self_sigstate (void) __attribute__ ((__const__));
+ #ifndef _ISOMAC
+diff --git a/sysdeps/mach/hurd/brk.c b/sysdeps/mach/hurd/brk.c
+index 4fac03fcc3..9955ce3329 100644
+--- a/sysdeps/mach/hurd/brk.c
++++ b/sysdeps/mach/hurd/brk.c
+@@ -18,7 +18,7 @@
+ #include <errno.h>
+ #include <hurd.h>
+ #include <hurd/resource.h>
+-#include <cthreads.h>		/* For `struct mutex'.  */
++#include <lock-intern.h>	/* For `struct mutex'.  */
+ 
+ 
+ /* Initial maximum size of the data segment (this is arbitrary).  */
+diff --git a/sysdeps/mach/hurd/cthreads.c b/sysdeps/mach/hurd/cthreads.c
+index 23dcedb72a..0e0d06b9e1 100644
+--- a/sysdeps/mach/hurd/cthreads.c
++++ b/sysdeps/mach/hurd/cthreads.c
+@@ -18,7 +18,7 @@
+ #include <libc-lock.h>
+ #include <errno.h>
+ #include <stdlib.h>
+-#include <cthreads.h>
++#include <pthreadP.h>
+ 
+ /* This serves as stub "self" pointer for libc locks when TLS is not initialized
+    yet.  */
+@@ -27,7 +27,7 @@ char __libc_lock_self0[0];
+ /* Placeholder for key creation routine from Hurd cthreads library.  */
+ int
+ weak_function
+-__cthread_keycreate (cthread_key_t *key)
++__cthread_keycreate (__cthread_key_t *key)
+ {
+   __set_errno (ENOSYS);
+  *key = -1;
+@@ -37,7 +37,7 @@ __cthread_keycreate (cthread_key_t *key)
+ /* Placeholder for key retrieval routine from Hurd cthreads library.  */
+ int
+ weak_function
+-__cthread_getspecific (cthread_key_t key, void **pval)
++__cthread_getspecific (__cthread_key_t key, void **pval)
+ {
+   *pval = NULL;
+   __set_errno (ENOSYS);
+@@ -47,7 +47,7 @@ __cthread_getspecific (cthread_key_t key, void **pval)
+ /* Placeholder for key setting routine from Hurd cthreads library.  */
+ int
+ weak_function
+-__cthread_setspecific (cthread_key_t key, void *val)
++__cthread_setspecific (__cthread_key_t key, void *val)
+ {
+   __set_errno (ENOSYS);
+   return -1;
+diff --git a/sysdeps/mach/hurd/fork.c b/sysdeps/mach/hurd/fork.c
+index 32783069ec..3767fd9a4c 100644
+--- a/sysdeps/mach/hurd/fork.c
++++ b/sysdeps/mach/hurd/fork.c
+@@ -497,7 +497,7 @@ __fork (void)
+ #else
+       if (__hurd_sigthread_stack_end == 0)
+ 	{
+-	  /* The signal thread has a stack assigned by cthreads.
++	  /* The signal thread has a stack assigned by pthread.
+ 	     The threadvar_stack variables conveniently tell us how
+ 	     to get to the highest address in the stack, just below
+ 	     the per-thread variables.  */
+diff --git a/sysdeps/mach/hurd/htl/bits/pthread-np.h b/sysdeps/mach/hurd/htl/bits/pthread-np.h
+index c15412de2c..f1e71dc1fc 100644
+--- a/sysdeps/mach/hurd/htl/bits/pthread-np.h
++++ b/sysdeps/mach/hurd/htl/bits/pthread-np.h
+@@ -17,7 +17,7 @@
+    <https://www.gnu.org/licenses/>.  */
+ 
+ /*
+- * Never include this file directly; use <pthread.h> or <cthreads.h> instead.
++ * Never include this file directly; use <pthread.h> instead.
+  */
+ 
+ #ifndef _BITS_PTHREAD_NP_H
+diff --git a/sysdeps/mach/hurd/i386/Makefile b/sysdeps/mach/hurd/i386/Makefile
+index daeb85ba4f..8e5f12a533 100644
+--- a/sysdeps/mach/hurd/i386/Makefile
++++ b/sysdeps/mach/hurd/i386/Makefile
+@@ -153,6 +153,8 @@ ifeq ($(subdir),elf)
+ # We do use nested functions involving creation of trampolines, notably for
+ # callbacks whose parameters don't permit to get the context parameters.
+ check-execstack-xfail += ld.so libc.so libpthread.so
++# We always create a thread for signals
++test-xfail-tst-single_threaded-pthread-static = yes
+ endif
+ 
+ ifeq ($(subdir),stdlib)
+diff --git a/sysdeps/mach/hurd/profil.c b/sysdeps/mach/hurd/profil.c
+index b475cc13b4..5d8e701975 100644
+--- a/sysdeps/mach/hurd/profil.c
++++ b/sysdeps/mach/hurd/profil.c
+@@ -22,7 +22,7 @@
+ #include <hurd.h>
+ #include <mach/mach4.h>
+ #include <mach/pc_sample.h>
+-#include <cthreads.h>
++#include <lock-intern.h>
+ #include <assert.h>
+ #include <libc-internal.h>
+ 
+-- 
+2.29.2
+
