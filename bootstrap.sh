@@ -139,7 +139,6 @@ compile_first_glibc() {
    mkdir -p "$GLIBC_SRC".first_obj &&
    cd "$GLIBC_SRC".first_obj &&
    BUILD_CC="$HOST_MACHINE-gcc" CC="$TARGET"-gcc \
-   # see https://sourceware.org/bugzilla/show_bug.cgi?id=24183
    CXX="$TARGET"-g++ \
    AR="$TARGET"-ar RANLIB="$TARGET"-ranlib \
    ../$GLIBC_SRC/configure \
@@ -201,7 +200,6 @@ compile_second_glibc() {
    cd "$GLIBC_SRC".second_obj &&
    rm -f config.cache &&
    BUILD_CC="$HOST_MACHINE-gcc" CC="$TARGET"-gcc \
-   # see https://sourceware.org/bugzilla/show_bug.cgi?id=24183
    CXX="$TARGET"-g++ \
    AR="$TARGET"-ar RANLIB="$TARGET"-ranlib \
    ../$GLIBC_SRC/configure \
