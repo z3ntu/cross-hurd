@@ -55,5 +55,6 @@ download_gcrypt &&
 
 download_make &&
 download_grep &&
+download_gawk &&
 
 download_sed 
